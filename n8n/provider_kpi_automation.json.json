@@ -1,0 +1,473 @@
+{
+  "name": "Provider KPI Dashboard Automation Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4d805c47-53a5-4eea-973f-47e1a38f5643",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code node (Run Once for All Items)\n// Adds run_date + normalizes numeric fields for Google Sheets\n\nconst runDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD\n\nreturn items.map(item => ({\n  json: {\n    run_date: runDate,\n    provider_name: item.json.provider_name,\n    specialty: item.json.specialty,\n    appts_60d: Number(item.json.appts_60d),\n    avg_resp_min: Number(item.json.avg_resp_min),\n    completion_rate: Number(item.json.completion_rate),\n    avg_rating: Number(item.json.avg_rating),\n    feedback_count: Number(item.json.feedback_count),\n    ops_status: item.json.ops_status\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ],
+      "id": "e023165e-fa5d-42d1-92e2-50c475e954b1",
+      "name": "Format Rows"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  p.provider_id,\n  p.provider_name,\n  p.specialty,\n  COUNT(a.appointment_id) AS appts_60d,\n  ROUND(AVG(a.response_time_minutes)::numeric, 1) AS avg_resp_min,\n  ROUND(AVG(CASE WHEN a.completed THEN 1 ELSE 0 END)::numeric, 3) AS completion_rate,\n  ROUND(AVG(f.rating)::numeric, 2) AS avg_rating,\n  COUNT(f.feedback_id) AS feedback_count,\n  CASE\n    WHEN AVG(a.response_time_minutes) >= 35\n      OR AVG(CASE WHEN a.completed THEN 1 ELSE 0 END) < 0.80\n      OR AVG(f.rating) < 3.0\n      THEN 'NEEDS INTERVENTION'\n    WHEN AVG(a.response_time_minutes) BETWEEN 20 AND 34\n      OR AVG(CASE WHEN a.completed THEN 1 ELSE 0 END) BETWEEN 0.80 AND 0.92\n      OR AVG(f.rating) BETWEEN 3.0 AND 3.7\n      THEN 'WATCH'\n    ELSE 'TOP PERFORMER'\n  END AS ops_status\nFROM providers p\nLEFT JOIN appointments a\n  ON a.provider_id = p.provider_id\n  AND a.appointment_date >= CURRENT_DATE - 60\nLEFT JOIN patient_feedback f\n  ON f.appointment_id = a.appointment_id\nGROUP BY 1,2,3\nORDER BY avg_rating DESC NULLS LAST, avg_resp_min ASC NULLS LAST;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "1251f2b9-70b7-4d66-afff-04837e2eec11",
+      "name": "KPI SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "5oGxLrq65UkvpmI6",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1E0NkhPmeL620kam3DW5iyijfaZIUP-LCBCwciSpCnnI",
+          "mode": "list",
+          "cachedResultName": "Provider KPI Dashboard",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1E0NkhPmeL620kam3DW5iyijfaZIUP-LCBCwciSpCnnI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "kpi_snapshot",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1E0NkhPmeL620kam3DW5iyijfaZIUP-LCBCwciSpCnnI/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_date": "={{$json.run_date}}",
+            "provider_name": "={{$json.provider_name}}",
+            "specialty": "={{$json.specialty}}",
+            "appts_60d": "={{$json.appts_60d}}",
+            "avg_resp_min": "={{$json.avg_resp_min}}",
+            "completion_rate": "={{$json.completion_rate}}",
+            "avg_rating": "={{$json.avg_rating}}",
+            "feedback_count": "={{$json.feedback_count}}",
+            "ops_status": "={{$json.ops_status}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "run_date",
+              "displayName": "run_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "provider_name",
+              "displayName": "provider_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "specialty",
+              "displayName": "specialty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "appts_60d",
+              "displayName": "appts_60d",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "avg_resp_min",
+              "displayName": "avg_resp_min",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "completion_rate",
+              "displayName": "completion_rate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "avg_rating",
+              "displayName": "avg_rating",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "feedback_count",
+              "displayName": "feedback_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ops_status",
+              "displayName": "ops_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "send_to",
+              "displayName": "send_to",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        608,
+        0
+      ],
+      "id": "ae474fae-ab88-4b30-868b-33e4825f43e5",
+      "name": "Write snapshot to Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "CUd4xZ9UL98Kfm9v",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Bundle all incoming items into one object and stringify it for Gemini\n// Code node must be \"Run Once for All Items\"\n\nconst run_date = items[0]?.json?.run_date ?? new Date().toISOString().slice(0, 10);\n\nconst providers = items.map(i => ({\n  provider_name: i.json.provider_name,\n  specialty: i.json.specialty,\n  appts_60d: i.json.appts_60d,\n  avg_resp_min: i.json.avg_resp_min,\n  completion_rate: i.json.completion_rate,\n  avg_rating: i.json.avg_rating,\n  feedback_count: i.json.feedback_count,\n  ops_status: i.json.ops_status\n}));\n\nconst payload = { run_date, providers };\n\nreturn [{\n  json: {\n    run_date,\n    providers,\n    json_text: JSON.stringify(payload, null, 2)\n  }\n}];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        0
+      ],
+      "id": "f61cef32-bf9c-4c88-bed8-958b51b5bf5d",
+      "name": "Prepare LLM Input"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a Clinical Operations analyst. You must only use the data provided.\nDo not invent provider names, metrics, categories, or percentages.\nIf a value is missing or null, write \"N/A\".\nIf the data is not present, say \"Not available in input data\".\nReturn only the requested report with no extra commentary.\n\nWrite an internal weekly provider KPI summary using ONLY the KPI data below.\n\nFormatting rules:\n- Use clear section headers.\n- Use bullet points where appropriate.\n- Use short paragraphs (no large blocks of text).\n- Output MUST be in Markdown format.\n\nHard rules:\n- Use ONLY provider names and numbers that appear in the input JSON.\n- Do NOT create or rename providers.\n- Do NOT estimate or infer numeric values not explicitly present.\n- If you cannot find a value, write \"N/A\".\n- Include metrics exactly as given (do not convert to % unless already a percentage).\n\nOutput format:\nOutput sections (in this order):\n## Subject Line\n## Executive Summary\n## Top Performers\n## Watch List\n## Needs Intervention\n## Recommended Next Steps\n\nInput JSON:\n{{ $json.json_text }}\n\n",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        992,
+        112
+      ],
+      "id": "a4d02d9f-193b-4c6d-ae0a-af1f064c49c4",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        880,
+        336
+      ],
+      "id": "d4332cf3-8eef-4d4a-a4c8-fd2412942df9",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "qZEmLSkcqlFsOxnR",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1472,
+        0
+      ],
+      "id": "fbc2ce00-8b2a-41ce-8d7d-bb1e20e45364",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "sendTo": "info@example.com",
+        "subject": "=Weekly Provider KPI Summary — {{$json.run_date}}",
+        "message": "={{$json.email_body_html}}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1808,
+        0
+      ],
+      "id": "469f39ba-1dcb-4543-9dda-52adae6a590c",
+      "name": "Send a message",
+      "webhookId": "9b198858-90b6-4e1e-8981-83fe7c573438",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "facRNhpz5km9KvhO",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find the item that contains the HTML email body\nconst htmlItem = items.find(i => typeof i.json.email_body_html === 'string');\n\n// Find the item that contains the run_date\nconst dataItem = items.find(i => i.json.run_date);\n\n// Safety fallbacks\nconst emailBodyHtml = htmlItem?.json?.email_body_html ?? '<p>[No email body found]</p>';\nconst runDate = dataItem?.json?.run_date ?? new Date().toISOString().slice(0, 10);\n\nreturn [\n  {\n    json: {\n      run_date: runDate,\n      email_body_html: emailBodyHtml\n    }\n  }\n];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        0
+      ],
+      "id": "4edf7a47-d83e-49f4-b82a-9464b1920bae",
+      "name": "Pick Text to One Item"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert Markdown-style headings to basic HTML for Gmail\n\nlet text = $json.email_body || $json.text || '';\n\n// Headings\ntext = text.replace(/^## (.*)$/gm, '<h2>$1</h2>');\ntext = text.replace(/^# (.*)$/gm, '<h1>$1</h1>');\n\n// Bullet points\ntext = text.replace(/^\\- (.*)$/gm, '<li>$1</li>');\ntext = text.replace(/(<li>.*<\\/li>)/gs, '<ul>$1</ul>');\n\n// Line breaks\ntext = text.replace(/\\n\\n/g, '<br/><br/>');\ntext = text.replace(/\\n/g, '<br/>');\n\nreturn [{\n  json: {\n    run_date: $json.run_date,\n    email_body_html: text\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        112
+      ],
+      "id": "01e447fd-2973-4cca-8af0-1e4508685c8f",
+      "name": "Markdown > HTML"
+    },
+    {
+      "parameters": {
+        "content": "# Provider KPI Dashboard Automation – n8n Workflow\n\n## Overview\n\nThis n8n workflow automates end-to-end provider performance monitoring for a healthcare Clinical Operations team.\n\nIt pulls provider activity data from a Supabase-hosted Postgres database, calculates operational KPIs, classifies providers by performance risk, logs historical KPI snapshots to Google Sheets, generates an AI-assisted executive summary using a large language model, and delivers a formatted weekly KPI report via email.\n\nThe workflow is designed to transform raw clinical operations data into actionable insights and communicate them clearly to cross-functional stakeholders.\n",
+        "height": 336,
+        "width": 1008
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        -432
+      ],
+      "id": "95d3d433-555c-4743-8d50-f958f06ee2f2",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# How to Use This Workflow\n\n## 0. Set Up the Database (Required)\n- Create the required Postgres tables:\n- Populate the tables with sample or production data.\n\n## 1. Configure Credentials\n- Set up Postgres credentials for the Supabase database.\n- Configure Google Sheets credentials for KPI snapshot logging.\n- Configure Google Gemini API credentials for AI summary generation.\n- Configure Gmail credentials for automated email delivery.\n\n## 2. Review KPI Logic\n- Inspect the SQL query to confirm KPI calculations and thresholds.\n- Update response time, completion rate, or rating cutoffs as needed to match operational standards.\n\n## 3. Activate the Workflow\n- Enable the workflow to run on the scheduled trigger.\n- By default, the workflow runs automatically on a weekly cadence.\n\n## 4. Monitor Outputs\n- Review KPI snapshots in the Google Sheets dashboard for historical trends.\n- Read the automated weekly KPI summary email for operational insights and flagged providers.\n\n## 5. Customize as Needed\n- Adjust reporting frequency by modifying the schedule trigger.\n- Update AI prompt wording to tailor tone for different stakeholders.\n- Extend the workflow to send alerts via Slack or log summaries back into the database.\n",
+        "height": 784,
+        "width": 704,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        -832
+      ],
+      "id": "9169e7ff-0019-4529-949f-4631e7d935b4",
+      "name": "Sticky Note1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "KPI SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KPI SQL query": {
+      "main": [
+        [
+          {
+            "node": "Format Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Rows": {
+      "main": [
+        [
+          {
+            "node": "Write snapshot to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write snapshot to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Prepare LLM Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare LLM Input": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Markdown > HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Pick Text to One Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Text to One Item": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown > HTML": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2d3124bc-482c-443e-ade8-4827be00a639",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9f65d1de108209ec46a801cb48812b1a1fe754417a806dbffe1a74da62df9826"
+  },
+  "id": "5iJGFsEwinl9KpSe",
+  "tags": []
+}
