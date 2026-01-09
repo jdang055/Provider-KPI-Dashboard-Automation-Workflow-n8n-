@@ -38,7 +38,7 @@ Then sanity check:
 select count(*) from providers;
 select count(*) from appointments;
 select count(*) from patient_feedback;
-
+```
 ## Setup and Usage
 
 ### 2) Configure n8n Credentials
