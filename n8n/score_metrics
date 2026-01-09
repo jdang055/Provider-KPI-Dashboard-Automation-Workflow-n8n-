@@ -1,0 +1,64 @@
+## KPI classification logic
+
+Providers are categorized each evaluation period (weekly) based on KPI thresholds derived from the performance bands above.  
+These labels are used by downstream automation to trigger alerts, summaries, and provider outreach workflows.
+
+### Classification categories
+
+| Category | Description |
+|---|---|
+| **TOP PERFORMER** | Consistently exceeds performance expectations |
+| **WATCH** | Metrics are within acceptable range but trending negatively |
+| **NEEDS INTERVENTION** | Performance falls below acceptable thresholds and requires ops follow-up |
+
+---
+
+### KPI thresholds (weekly evaluation)
+
+A provider is classified using the following rules:
+
+#### 🟢 TOP PERFORMER
+All of the following must be true:
+- Avg response time **≤ 10 minutes**
+- Appointment completion rate **≥ 95%**
+- Avg patient satisfaction **≥ 4.6**
+- Minimum appointment volume threshold met (to avoid low-sample bias)
+
+#### 🟡 WATCH
+Any of the following conditions:
+- Avg response time **10–20 minutes**
+- Completion rate **88–94%**
+- Satisfaction **4.2–4.5**
+- Negative week-over-week trend in **any** KPI (even if still within acceptable range)
+
+WATCH status is intended to surface early signals before performance degrades further.
+
+#### 🔴 NEEDS INTERVENTION
+Any of the following conditions:
+- Avg response time **> 20 minutes**
+- Completion rate **< 88%**
+- Satisfaction **< 4.2**
+- Sustained negative trend across **2+ weeks**
+
+This category triggers provider outreach and operational follow-up workflows.
+
+---
+
+### Trend detection logic
+
+Trends are evaluated week-over-week using percentage or absolute deltas:
+
+- **Response time:** ≥ +20% increase week-over-week
+- **Completion rate:** ≥ −5 percentage point drop
+- **Satisfaction:** ≥ −0.3 rating drop
+
+Trend signals can escalate a provider to **WATCH** or **NEEDS INTERVENTION** even if absolute thresholds are not yet crossed.
+
+---
+
+### Operational notes
+- Classification is recalculated weekly using rolling 7-day or calendar-week windows.
+- Providers with very low appointment volume may be excluded or flagged for manual review.
+- Thresholds are configurable and stored separately from SQL logic to reflect real-world ops flexibility.
+
+This classification framework allows the system to move beyond reporting and actively support clinical operations decision-making.
