@@ -3,6 +3,8 @@
 Automated provider performance monitoring workflow for a Clinical Operations team.  
 Pulls KPIs from Postgres (Supabase), logs historical snapshots to Google Sheets, generates an AI-assisted ops summary (Gemini), and sends a formatted weekly KPI email via Gmail.
 
+![Issue Routing Architecture](n8n/workflow.png)
+
 ## Why this project
 Clinical Ops teams need consistent, data-driven visibility into provider performance. This workflow simulates a real KPI-driven operations loop:
 **SQL → KPI classification → dashboard logging → AI summary → stakeholder email**
